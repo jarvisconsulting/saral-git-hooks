@@ -1,0 +1,14 @@
+repos:
+  - repo: local
+    hooks:
+      - id: jira-check
+        name: JIRA Commit Message Check
+        entry: scripts/jira-check.sh
+        language: system
+        stages: [commit-msg]
+
+      - id: docker-build
+        name: Docker Build Validation
+        entry: scripts/docker-build.sh
+        language: system
+        stages: [pre-push]
