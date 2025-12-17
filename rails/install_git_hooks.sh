@@ -16,35 +16,20 @@ if [ ! -d ".git" ]; then
 fi
 
 # -----------------------------
-# Install pre-commit if missing
+# Check pre-commit
 # -----------------------------
 if ! command -v pre-commit >/dev/null 2>&1; then
-  echo "📦 pre-commit not found. Installing..."
-
-  if command -v apt >/dev/null 2>&1; then
-    echo "➡️ Installing via apt..."
-    sudo apt update -y
-    sudo apt install -y pre-commit
-
-  elif command -v brew >/dev/null 2>&1; then
-    echo "➡️ Installing via Homebrew..."
-    brew install pre-commit
-
-  else
-    echo "❌ pre-commit not found and no supported package manager available."
-    echo "👉 Install manually:"
-    echo "   Ubuntu/Debian: sudo apt install pre-commit"
-    echo "   macOS: brew install pre-commit"
-    exit 1
-  fi
+  echo ""
+  echo "❌ pre-commit is not installed."
+  echo ""
+  echo "👉 Please install it manually:"
+  echo "   Ubuntu/Debian: sudo apt install pre-commit"
+  echo "   macOS: brew install pre-commit"
+  echo ""
+  echo "ℹ️ Skipping git hook installation."
+  exit 0
 else
   echo "✔ pre-commit already installed"
-fi
-
-# Final sanity check
-if ! command -v pre-commit >/dev/null 2>&1; then
-  echo "❌ pre-commit installation failed or not in PATH"
-  exit 1
 fi
 
 HOOKS_DIR=".git/hooks"
@@ -70,5 +55,3 @@ else
 fi
 
 echo "✅ Git hooks installation complete"
-
-
