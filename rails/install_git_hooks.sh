@@ -1,65 +1,47 @@
 #!/bin/bash
 set -e
 
-echo "🔧 Starting git hooks setup..."
+echo "🚀 Starting Lefthook setup..."
 
-CONFIG_FILE=".pre-commit-config.yaml"
 
-if [ ! -f "$CONFIG_FILE" ]; then
-  echo "📄 pre-commit config not found. Downloading..."
+# Variables
+LEFTHOOK_YML_URL="https://raw.githubusercontent.com/jarvisconsulting/saral-git-hooks/test/rails/lefthook.yml"
+LEFTHOOK_INSTALL_URL="https://raw.githubusercontent.com/evilmartians/lefthook/master/install.sh"
 
-  curl -fsSL \
-    https://raw.githubusercontent.com/jarvisconsulting/saral-git-hooks/test/rails/.pre-commit-config.yaml \
-    -o "$CONFIG_FILE"
 
-  echo "✅ .pre-commit-config.yaml downloaded"
-else
-  echo "✔ .pre-commit-config.yaml already exists"
-fi
+# Install Lefthook if missing
+if ! command -v lefthook >/dev/null 2>&1; then
+  echo "📦 Lefthook not found. Installing..."
 
-# -----------------------------
-# Install pre-commit if missing
-# -----------------------------
-if ! command -v pre-commit >/dev/null 2>&1; then
-  echo "📦 pre-commit not found."
+  curl -fsSL "$LEFTHOOK_INSTALL_URL" | bash
 
-  if command -v apt-get >/dev/null 2>&1; then
-    echo "➡️ Installing pre-commit via apt-get..."
-    sudo apt-get install -y pre-commit
-  else
-    echo ""
-    echo "❌ Automatic installation not supported on this system."
-    echo ""
-    echo "👉 Please install pre-commit manually:"
-    echo ""
-    echo "   Ubuntu / Debian:"
-    echo "     sudo apt install pre-commit"
-    echo ""
-    echo "   macOS:"
-    echo "     brew install pre-commit"
-    echo ""
-    echo "   Docs:"
-    echo "     https://pre-commit.com/#install"
-    echo ""
-    exit 1
+  # Add to PATH for current shell
+  if [ -d "$HOME/.lefthook/bin" ]; then
+    export PATH="$HOME/.lefthook/bin:$PATH"
   fi
 else
-  echo "✔ pre-commit already installed"
+  echo "✔ Lefthook already installed"
 fi
 
+
 # Final sanity check
-if ! command -v pre-commit >/dev/null 2>&1; then
-  echo "❌ pre-commit installation failed"
+if ! command -v lefthook >/dev/null 2>&1; then
+  echo "❌ Lefthook installation failed"
   exit 1
 fi
 
-# -----------------------------
+# Download lefthook.yml if missing
+if [ ! -f "lefthook.yml" ]; then
+  echo "📄 Downloading lefthook.yml..."
+  curl -fsSL "$LEFTHOOK_YML_URL" -o lefthook.yml
+  echo "✅ lefthook.yml downloaded"
+else
+  echo "✔ lefthook.yml already exists (skipping)"
+fi
+
+
 # Install git hooks
-# -----------------------------
-echo "🔗 Installing pre-push hook..."
-pre-commit install --hook-type pre-push || true
+echo "🔗 Installing git hooks via Lefthook..."
+lefthook install || true
 
-echo "🔗 Installing commit-msg hook..."
-pre-commit install --hook-type commit-msg || true
-
-echo "✅ Git hooks installation complete"
+echo "✅ Lefthook setup complete"

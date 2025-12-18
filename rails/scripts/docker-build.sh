@@ -21,9 +21,8 @@ if [ -z "$RAILS_MASTER_KEY" ] || [ -z "$ACCESS_TOKEN" ]; then
   exit 1
 fi
 
+
 echo "🔐 Loaded credentials."
-
-
 MESSAGE=$(git log -1 --pretty=%B)
 
 # 3. Skip-build detection (regex)

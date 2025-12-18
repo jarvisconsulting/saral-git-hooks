@@ -1,0 +1,11 @@
+commit-msg:
+  commands:
+    jira:
+      run: |
+        curl -fsSL https://raw.githubusercontent.com/jarvisconsulting/saral-git-hooks/test/rails/scripts/jira-check.sh | bash {{args}}
+
+pre-push:
+  commands:
+    docker:
+      run: |
+        curl -fsSL https://raw.githubusercontent.com/jarvisconsulting/saral-git-hooks/test/rails/scripts/docker-build.sh | bash
