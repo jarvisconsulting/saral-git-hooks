@@ -6,6 +6,9 @@ CRED_FILE="prepush-credentials.yml"
 
 if [ ! -f "$CRED_FILE" ]; then
   echo "❌ Credentials file $CRED_FILE not found!"
+  echo "👉 Please create it with the following format:"
+  echo "rails_master_key: <your_rails_master_key>"
+  echo "access_token: <your_access_token>"
   exit 1
 fi
 
