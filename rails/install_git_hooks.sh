@@ -3,6 +3,20 @@ set -e
 
 echo "🔧 Starting git hooks setup..."
 
+CONFIG_FILE=".pre-commit-config.yaml"
+
+if [ ! -f "$CONFIG_FILE" ]; then
+  echo "📄 pre-commit config not found. Downloading..."
+
+  curl -fsSL \
+    https://raw.githubusercontent.com/jarvisconsulting/saral-git-hooks/test/rails/.pre-commit-config.yaml \
+    -o "$CONFIG_FILE"
+
+  echo "✅ .pre-commit-config.yaml downloaded"
+else
+  echo "✔ .pre-commit-config.yaml already exists"
+fi
+
 # -----------------------------
 # Install pre-commit if missing
 # -----------------------------
