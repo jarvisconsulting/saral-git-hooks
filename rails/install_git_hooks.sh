@@ -5,7 +5,7 @@ echo "🚀 Starting Lefthook setup..."
 
 
 # Variables
-LEFTHOOK_YML_URL="https://raw.githubusercontent.com/jarvisconsulting/saral-git-hooks/test/rails/install_git_hooks.sh"
+LEFTHOOK_YML_URL="https://raw.githubusercontent.com/jarvisconsulting/saral-git-hooks/test/rails/lefthook.yml"
 LEFTHOOK_INSTALL_URL="https://raw.githubusercontent.com/evilmartians/lefthook/master/install.sh"
 
 
