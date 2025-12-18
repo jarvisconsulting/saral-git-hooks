@@ -3,6 +3,18 @@ set -e
 
 echo "🔧 Starting pre-commit setup..."
 
+
+# Find project root (git root)
+if ! PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null); then
+  echo "❌ Not inside a git repository."
+  exit 1
+fi
+
+echo "📁 Project root detected: $PROJECT_ROOT"
+
+cd "$PROJECT_ROOT"
+
+
 # Config (REMOTE REPO)
 REMOTE_BASE_URL="https://raw.githubusercontent.com/jarvisconsulting/saral-git-hooks/test/rails"
 
@@ -38,6 +50,7 @@ fi
 
 
 # Download .pre-commit-config.yaml
+
 echo "📄 Downloading .pre-commit-config.yaml..."
 curl -fsSL "$PRE_COMMIT_CONFIG_URL" -o .pre-commit-config.yaml
 echo "✔ .pre-commit-config.yaml ready"
