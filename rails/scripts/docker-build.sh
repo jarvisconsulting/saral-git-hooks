@@ -28,8 +28,8 @@ MESSAGE=$(git log -1 --pretty=%B)
 
 # 3. Skip-build detection (regex)
 # Matches: skip-build, skip build, skip_build
-if echo "$MESSAGE" | grep -Eiq "skip[-_ ]?build"; then
-  echo "⏭ Build skipped (matched skip-build regex)"
+if echo "$MESSAGE" | grep -Eq "\bskip[-_ ]?build\b"; then
+  echo "⏭ Build skipped (matched skip-build flag)"
   exit 0
 fi
 
