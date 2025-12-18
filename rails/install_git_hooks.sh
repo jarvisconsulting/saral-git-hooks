@@ -1,53 +1,57 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-echo "🚀 Starting Lefthook setup..."
+echo "🚀 Setting up Lefthook for this project..."
 
 # -----------------------------
-# Variables
+# Config
 # -----------------------------
 LEFTHOOK_YML_URL="https://raw.githubusercontent.com/jarvisconsulting/saral-git-hooks/test/rails/lefthook.yml"
+LEFTHOOK_YML_FILE="lefthook.yml"
+FORCE_UPDATE="${FORCE_UPDATE:-0}"
 
 # -----------------------------
-# Install Lefthook (APT)
+# Helpers
 # -----------------------------
-if ! command -v lefthook >/dev/null 2>&1; then
-  echo "📦 Lefthook not found. Installing via apt..."
+log() {
+  echo "👉 $1"
+}
 
-  # Add Lefthook APT repo (official)
-  curl -1sLf 'https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.deb.sh' | sudo -E bash
-
-  # Install Lefthook
-  sudo apt install -y lefthook
-else
-  echo "✔ Lefthook already installed"
-fi
-
-# -----------------------------
-# Final sanity check
-# -----------------------------
-if ! command -v lefthook >/dev/null 2>&1; then
-  echo "❌ Lefthook installation failed"
+error() {
+  echo "❌ $1"
   exit 1
+}
+
+# -----------------------------
+# Check Lefthook exists
+# -----------------------------
+if ! command -v lefthook >/dev/null 2>&1; then
+  error "Lefthook is not installed.
+
+👉 Install it once using:
+   cd ~
+   curl -1sLf https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.deb.sh | sudo -E bash
+   sudo apt install lefthook
+"
 fi
 
-echo "✅ Lefthook installed: $(lefthook version)"
+log "Lefthook found: $(lefthook version)"
 
 # -----------------------------
 # Download lefthook.yml
 # -----------------------------
-if [ ! -f "lefthook.yml" ]; then
-  echo "📄 Downloading lefthook.yml..."
-  curl -fsSL "$LEFTHOOK_YML_URL" -o lefthook.yml
-  echo "✅ lefthook.yml downloaded"
+if [ ! -f "$LEFTHOOK_YML_FILE" ] || [ "$FORCE_UPDATE" = "1" ]; then
+  log "Downloading lefthook.yml..."
+  curl -fsSL "$LEFTHOOK_YML_URL" -o "$LEFTHOOK_YML_FILE"
+  log "lefthook.yml ready"
 else
-  echo "✔ lefthook.yml already exists (skipping)"
+  log "lefthook.yml already exists (use FORCE_UPDATE=1 to overwrite)"
 fi
 
 # -----------------------------
 # Install git hooks
 # -----------------------------
-echo "🔗 Installing git hooks via Lefthook..."
-lefthook install || true
+log "Installing git hooks..."
+lefthook install
 
-echo "🎉 Lefthook setup complete"
+echo "🎉 Lefthook project setup complete"
