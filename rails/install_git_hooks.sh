@@ -16,7 +16,6 @@ if ! command -v pre-commit >/dev/null 2>&1; then
   echo "📦 pre-commit not found. Installing via apt-get..."
 
   if command -v apt-get >/dev/null 2>&1; then
-    sudo apt-get update -y
     sudo apt-get install -y pre-commit
   else
     echo "❌ apt-get not found. Cannot install pre-commit automatically."
@@ -26,10 +25,14 @@ else
   echo "✔ pre-commit already installed"
 fi
 
+# --------------------------------------------------
 # Create directories
+# --------------------------------------------------
 mkdir -p scripts
 
+# --------------------------------------------------
 # Write commit-msg hook (JIRA + skip-build)
+# --------------------------------------------------
 cat > scripts/commit-msg.sh <<'EOF'
 #!/bin/bash
 set -e
@@ -65,24 +68,28 @@ EOF
 
 chmod +x scripts/commit-msg.sh
 
-
-# Write pre-push hook
+# --------------------------------------------------
+# Write pre-push hook (image name from credentials)
+# --------------------------------------------------
 cat > scripts/pre-push.sh <<'EOF'
 #!/bin/bash
 set -e
 
-IMAGE_NAME="mlmp-app"
 CRED_FILE="prepush-credentials.yml"
 
 MESSAGE=$(git log -1 --pretty=%B)
 
+# --------------------------------------------------
 # Skip-build flag
+# --------------------------------------------------
 if echo "$MESSAGE" | grep -Eq "\bskip[-_ ]?build\b"; then
   echo "⏭ Build skipped (skip-build flag detected)"
   exit 0
 fi
 
+# --------------------------------------------------
 # JIRA validation
+# --------------------------------------------------
 if ! echo "$MESSAGE" | grep -Eq "\b[A-Z]+-[0-9]+\b"; then
   echo ""
   echo "❌ Push rejected!"
@@ -90,7 +97,9 @@ if ! echo "$MESSAGE" | grep -Eq "\b[A-Z]+-[0-9]+\b"; then
   exit 1
 fi
 
+# --------------------------------------------------
 # Credentials file check
+# --------------------------------------------------
 if [ ! -f "$CRED_FILE" ]; then
   echo ""
   echo "❌ Missing $CRED_FILE"
@@ -99,15 +108,24 @@ if [ ! -f "$CRED_FILE" ]; then
   echo ""
   echo "rails_master_key: YOUR_RAILS_MASTER_KEY"
   echo "access_token: YOUR_ACCESS_TOKEN"
+  echo "image_name: YOUR_DOCKER_IMAGE_NAME"
   echo ""
   exit 1
 fi
 
+# --------------------------------------------------
+# Parse credentials
+# --------------------------------------------------
 RAILS_MASTER_KEY=$(awk -F': ' '/rails_master_key/ {print $2}' "$CRED_FILE")
 ACCESS_TOKEN=$(awk -F': ' '/access_token/ {print $2}' "$CRED_FILE")
+IMAGE_NAME=$(awk -F': ' '/image_name/ {print $2}' "$CRED_FILE")
 
-if [ -z "$RAILS_MASTER_KEY" ] || [ -z "$ACCESS_TOKEN" ]; then
+if [ -z "$RAILS_MASTER_KEY" ] || [ -z "$ACCESS_TOKEN" ] || [ -z "$IMAGE_NAME" ]; then
   echo "❌ Credentials file is incomplete"
+  echo "👉 Required keys:"
+  echo "   - rails_master_key"
+  echo "   - access_token"
+  echo "   - image_name"
   exit 1
 fi
 
@@ -116,6 +134,9 @@ echo "🐳 Docker image to be built:"
 echo "👉 Image name: $IMAGE_NAME"
 echo ""
 
+# --------------------------------------------------
+# Docker build
+# --------------------------------------------------
 echo "🐳 Running Docker build..."
 
 docker build \
@@ -131,8 +152,9 @@ EOF
 
 chmod +x scripts/pre-push.sh
 
-
+# --------------------------------------------------
 # Write .pre-commit-config.yaml
+# --------------------------------------------------
 cat > .pre-commit-config.yaml <<'EOF'
 repos:
   - repo: local
@@ -150,8 +172,9 @@ repos:
         stages: [pre-push]
 EOF
 
-
+# --------------------------------------------------
 # Update .gitignore
+# --------------------------------------------------
 touch .gitignore
 
 grep -qxF ".pre-commit-config.yaml" .gitignore || echo ".pre-commit-config.yaml" >> .gitignore
@@ -160,8 +183,9 @@ grep -qxF "prepush-credentials.yml" .gitignore || echo "prepush-credentials.yml"
 
 echo "📝 Updated .gitignore"
 
-
+# --------------------------------------------------
 # Install hooks
+# --------------------------------------------------
 echo "🔗 Installing git hooks..."
 pre-commit install --hook-type commit-msg
 pre-commit install --hook-type pre-push
@@ -171,4 +195,4 @@ echo "🎉 pre-commit & pre-push fully set up!"
 echo "✔ JIRA enforced"
 echo "✔ skip-build supported"
 echo "✔ Docker validated on push"
-echo "✔ Image name printed"
+echo "✔ Image name loaded from credentials"
