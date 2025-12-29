@@ -117,14 +117,12 @@ fi
 # --------------------------------------------------
 RAILS_MASTER_KEY=$(awk -F': ' '/rails_master_key/ {print $2}' "$CRED_FILE")
 ACCESS_TOKEN=$(awk -F': ' '/access_token/ {print $2}' "$CRED_FILE")
-# IMAGE_NAME=$(awk -F': ' '/image_name/ {print $2}' "$CRED_FILE")
 
 if [ -z "$RAILS_MASTER_KEY" ] || [ -z "$ACCESS_TOKEN" ] ; then
   echo "❌ Credentials file is incomplete"
   echo "👉 Required keys:"
   echo "   - rails_master_key"
   echo "   - access_token"
-  # echo "   - image_name"
   exit 1
 fi
 
@@ -140,8 +138,7 @@ echo "🐳 Running Docker build..."
 
 docker build \
   --build-arg _RAILS_MASTER_KEY="$RAILS_MASTER_KEY" \
-  --build-arg _ACCESS_TOKEN="$ACCESS_TOKEN" \
-  -t "$IMAGE_NAME" .
+  --build-arg _ACCESS_TOKEN="$ACCESS_TOKEN" .
 
 echo ""
 echo "✅ Docker build successful"
