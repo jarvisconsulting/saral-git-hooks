@@ -4,7 +4,9 @@ set -e
 
 echo "🚀 Bootstrapping pre-commit & pre-push hooks..."
 
+# --------------------------------------------------
 # Resolve project root (git root)
+# --------------------------------------------------
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 
