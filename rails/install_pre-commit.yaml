@@ -17,7 +17,6 @@ if ! command -v pre-commit >/dev/null 2>&1; then
   echo "📦 pre-commit not found."
   if command -v apt-get >/dev/null 2>&1; then
     echo "➡️ Installing pre-commit via apt-get..."
-    sudo apt-get update -y
     sudo apt-get install -y pre-commit
   else
     echo "❌ pre-commit not installed and automatic install not supported."
