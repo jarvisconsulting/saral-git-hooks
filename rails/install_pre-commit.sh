@@ -9,7 +9,10 @@ echo "🚀 Bootstrapping pre-commit & pre-push hooks..."
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 
+
+
 echo "📁 Project root: $PROJECT_ROOT"
+
 
 # --------------------------------------------------
 # Install pre-commit
@@ -19,9 +22,11 @@ if ! command -v pre-commit >/dev/null 2>&1; then
 
   if command -v apt-get >/dev/null 2>&1; then
     sudo apt-get update
+
     sudo apt-get install -y pre-commit
   else
     echo "❌ apt-get not found. Cannot install pre-commit automatically."
+
     exit 1
   fi
 else
@@ -33,21 +38,43 @@ fi
 # --------------------------------------------------
 mkdir -p scripts
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # --------------------------------------------------
 # Write commit-msg hook (JIRA + skip-build)
-# NOTE: Inner heredoc uses \EOF so the outer shell
-#       does not mistake it for its own EOF delimiter.
 # --------------------------------------------------
-cat > scripts/commit-msg.sh <<\EOF
+cat > scripts/commit-msg.sh <<'EOF'
+
+
+
+
+
 #!/bin/bash
 set -e
+
+
 
 COMMIT_MSG_FILE="$1"
 
 if [ -z "$COMMIT_MSG_FILE" ] || [ ! -f "$COMMIT_MSG_FILE" ]; then
-  echo "❌ Commit message file not found"
-  exit 1
-fi
+@@ -80,51 +50,155 @@ fi
 
 MESSAGE=$(cat "$COMMIT_MSG_FILE")
 
@@ -75,9 +102,8 @@ chmod +x scripts/commit-msg.sh
 
 # --------------------------------------------------
 # Write pre-push hook (DYNAMIC BUILD ARGS)
-# NOTE: Inner heredoc uses \EOF for the same reason.
 # --------------------------------------------------
-cat > scripts/pre-push.sh <<\EOF
+cat > scripts/pre-push.sh <<'EOF'
 #!/bin/bash
 set -e
 
@@ -163,9 +189,8 @@ chmod +x scripts/pre-push.sh
 
 # --------------------------------------------------
 # Write .pre-commit-config.yaml
-# NOTE: \EOF used here too for consistency/safety.
 # --------------------------------------------------
-cat > .pre-commit-config.yaml <<\EOF
+cat > .pre-commit-config.yaml <<'EOF'
 repos:
   - repo: local
     hooks:
@@ -192,6 +217,7 @@ grep -qxF "scripts/" .gitignore || echo "scripts/" >> .gitignore
 grep -qxF "cred.yml" .gitignore || echo "cred.yml" >> .gitignore
 
 echo "📝 Updated .gitignore"
+
 
 # --------------------------------------------------
 # Install hooks
