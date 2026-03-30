@@ -1,4 +1,3 @@
-```bash
 #!/bin/bash
 set -e
 
@@ -36,8 +35,10 @@ mkdir -p scripts
 
 # --------------------------------------------------
 # Write commit-msg hook (JIRA + skip-build)
+# NOTE: Inner heredoc uses \EOF so the outer shell
+#       does not mistake it for its own EOF delimiter.
 # --------------------------------------------------
-cat > scripts/commit-msg.sh <<'EOF'
+cat > scripts/commit-msg.sh <<\EOF
 #!/bin/bash
 set -e
 
@@ -74,8 +75,9 @@ chmod +x scripts/commit-msg.sh
 
 # --------------------------------------------------
 # Write pre-push hook (DYNAMIC BUILD ARGS)
+# NOTE: Inner heredoc uses \EOF for the same reason.
 # --------------------------------------------------
-cat > scripts/pre-push.sh <<'EOF'
+cat > scripts/pre-push.sh <<\EOF
 #!/bin/bash
 set -e
 
@@ -161,8 +163,9 @@ chmod +x scripts/pre-push.sh
 
 # --------------------------------------------------
 # Write .pre-commit-config.yaml
+# NOTE: \EOF used here too for consistency/safety.
 # --------------------------------------------------
-cat > .pre-commit-config.yaml <<'EOF'
+cat > .pre-commit-config.yaml <<\EOF
 repos:
   - repo: local
     hooks:
