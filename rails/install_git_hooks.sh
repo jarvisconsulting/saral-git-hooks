@@ -1,25 +1,21 @@
-```bash
 #!/bin/bash
 set -e
 
 echo "🚀 Bootstrapping pre-commit & pre-push hooks..."
 
-# --------------------------------------------------
+
 # Resolve project root (git root)
-# --------------------------------------------------
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 
 echo "📁 Project root: $PROJECT_ROOT"
 
-# --------------------------------------------------
-# Install pre-commit
-# --------------------------------------------------
+
+# Install pre-commit 
 if ! command -v pre-commit >/dev/null 2>&1; then
   echo "📦 pre-commit not found. Installing via apt-get..."
 
   if command -v apt-get >/dev/null 2>&1; then
-    sudo apt-get update
     sudo apt-get install -y pre-commit
   else
     echo "❌ apt-get not found. Cannot install pre-commit automatically."
@@ -73,13 +69,13 @@ EOF
 chmod +x scripts/commit-msg.sh
 
 # --------------------------------------------------
-# Write pre-push hook (DYNAMIC BUILD ARGS)
+# Write pre-push hook (image name from credentials)
 # --------------------------------------------------
 cat > scripts/pre-push.sh <<'EOF'
 #!/bin/bash
 set -e
 
-CRED_FILE="cred.yml"
+CRED_FILE="prepush-credentials.yml"
 
 MESSAGE=$(git log -1 --pretty=%B)
 
@@ -107,41 +103,35 @@ fi
 if [ ! -f "$CRED_FILE" ]; then
   echo ""
   echo "❌ Missing $CRED_FILE"
-  echo "👉 Create it like:"
   echo ""
-  echo "KEY: value"
-  echo "ANOTHER_KEY: value"
+  echo "👉 Create it at project root with:"
+  echo ""
+  echo "rails_master_key: YOUR_RAILS_MASTER_KEY"
+  echo "access_token: YOUR_ACCESS_TOKEN"
+  echo "image_name: YOUR_DOCKER_IMAGE_NAME"
   echo ""
   exit 1
 fi
 
+# --------------------------------------------------
+# Parse credentials
+# --------------------------------------------------
+RAILS_MASTER_KEY=$(awk -F': ' '/rails_master_key/ {print $2}' "$CRED_FILE")
+ACCESS_TOKEN=$(awk -F': ' '/access_token/ {print $2}' "$CRED_FILE")
+IMAGE_NAME=$(awk -F': ' '/image_name/ {print $2}' "$CRED_FILE")
+
+if [ -z "$RAILS_MASTER_KEY" ] || [ -z "$ACCESS_TOKEN" ] || [ -z "$IMAGE_NAME" ]; then
+  echo "❌ Credentials file is incomplete"
+  echo "👉 Required keys:"
+  echo "   - rails_master_key"
+  echo "   - access_token"
+  echo "   - image_name"
+  exit 1
+fi
+
 echo ""
-echo "📦 Reading build args from $CRED_FILE..."
-
-# --------------------------------------------------
-# Parse YAML dynamically (flat key:value only)
-# --------------------------------------------------
-BUILD_ARGS=""
-
-while IFS=":" read -r key value; do
-  # skip comments & empty lines
-  [[ -z "$key" || "$key" =~ ^# ]] && continue
-
-  key=$(echo "$key" | xargs)
-  value=$(echo "$value" | xargs)
-
-  [[ -z "$key" || -z "$value" ]] && continue
-
-  BUILD_ARGS="$BUILD_ARGS --build-arg $key=$value"
-
-done < "$CRED_FILE"
-
-# --------------------------------------------------
-# Debug
-# --------------------------------------------------
-echo ""
-echo "🐳 Docker build args:"
-echo "$BUILD_ARGS"
+echo "🐳 Docker image to be built:"
+echo "👉 Image name: $IMAGE_NAME"
 echo ""
 
 # --------------------------------------------------
@@ -149,11 +139,14 @@ echo ""
 # --------------------------------------------------
 echo "🐳 Running Docker build..."
 
-docker build $BUILD_ARGS .
+docker build \
+  --build-arg _RAILS_MASTER_KEY="$RAILS_MASTER_KEY" \
+  --build-arg _ACCESS_TOKEN="$ACCESS_TOKEN" \
+  -t "$IMAGE_NAME" .
 
 echo ""
 echo "✅ Docker build successful"
-
+echo "📦 Built image: $IMAGE_NAME"
 exit 0
 EOF
 
@@ -186,7 +179,7 @@ touch .gitignore
 
 grep -qxF ".pre-commit-config.yaml" .gitignore || echo ".pre-commit-config.yaml" >> .gitignore
 grep -qxF "scripts/" .gitignore || echo "scripts/" >> .gitignore
-grep -qxF "cred.yml" .gitignore || echo "cred.yml" >> .gitignore
+grep -qxF "prepush-credentials.yml" .gitignore || echo "prepush-credentials.yml" >> .gitignore
 
 echo "📝 Updated .gitignore"
 
@@ -201,5 +194,5 @@ echo ""
 echo "🎉 pre-commit & pre-push fully set up!"
 echo "✔ JIRA enforced"
 echo "✔ skip-build supported"
-echo "✔ Dynamic Docker build args from cred.yml"
-```
+echo "✔ Docker validated on push"
+echo "✔ Image name loaded from credentials"
