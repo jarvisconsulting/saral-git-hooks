@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
-
 echo "🚀 Bootstrapping pre-commit (single-file remote installer)..."
-
 # --------------------------------------------------
 # 1. Detect project root
 # --------------------------------------------------
@@ -10,16 +8,13 @@ if ! PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null); then
   echo "❌ Not inside a git repository."
   exit 1
 fi
-
 echo "📁 Project root: $PROJECT_ROOT"
 cd "$PROJECT_ROOT"
-
 # --------------------------------------------------
 # 2. Ensure pre-commit is installed
 # --------------------------------------------------
 if ! command -v pre-commit >/dev/null 2>&1; then
   echo "📦 pre-commit not found."
-
   if command -v apt-get >/dev/null 2>&1; then
     echo "➡️ Installing pre-commit via apt-get..."
     sudo apt-get update -y
@@ -32,12 +27,10 @@ if ! command -v pre-commit >/dev/null 2>&1; then
 else
   echo "✔ pre-commit already installed"
 fi
-
 # --------------------------------------------------
 # 3. Write .pre-commit-config.yaml
 # --------------------------------------------------
 echo "📄 Writing .pre-commit-config.yaml..."
-
 cat > .pre-commit-config.yaml <<'YAML'
 repos:
   - repo: local
@@ -47,39 +40,29 @@ repos:
         entry: scripts/jira-check.sh
         language: system
         stages: [commit-msg]
-
       - id: docker-build
         name: Docker Build Validation
         entry: scripts/docker-build.sh
         language: system
         stages: [pre-push]
 YAML
-
 echo "✔ .pre-commit-config.yaml created"
-
 # --------------------------------------------------
 # 4. Write hook scripts
 # --------------------------------------------------
 echo "📂 Writing hook scripts..."
-
 mkdir -p scripts
-
 # ---- jira-check.sh ----
 cat > scripts/jira-check.sh <<'EOF'
 #!/bin/bash
 set -e
-
 echo "🔍 Validating commit message for JIRA ticket..."
-
 COMMIT_MSG_FILE="$1"
-
 if [ -z "$COMMIT_MSG_FILE" ] || [ ! -f "$COMMIT_MSG_FILE" ]; then
   echo "❌ Commit message file not found"
   exit 1
 fi
-
 MESSAGE=$(cat "$COMMIT_MSG_FILE")
-
 # JIRA ticket anywhere in message
 if ! echo "$MESSAGE" | grep -Eq "\b[A-Z]+-[0-9]+\b"; then
   echo ""
@@ -89,16 +72,13 @@ if ! echo "$MESSAGE" | grep -Eq "\b[A-Z]+-[0-9]+\b"; then
   echo ""
   exit 1
 fi
-
 echo "✔ Commit message contains valid JIRA ticket"
 exit 0
 EOF
-
 # ---- docker-build.sh ----
 cat > scripts/docker-build.sh <<'EOF'
 #!/bin/bash
 set -e
-
 echo "🐳 Running Docker build validation..."
 
 MESSAGE=$(git log -1 --pretty=%B)
@@ -109,22 +89,50 @@ if echo "$MESSAGE" | grep -Eq "\bskip[-_ ]?build\b"; then
   exit 0
 fi
 
-docker build -t precommit-check .
+# --------------------------------------------------
+# Dynamically load build args from .env file
+# --------------------------------------------------
+BUILD_ARGS=""
+ENV_FILE="${DOCKER_ENV_FILE:-.env}"
+
+if [ -f "$ENV_FILE" ]; then
+  echo "📄 Loading build args from $ENV_FILE..."
+  while IFS= read -r line || [ -n "$line" ]; do
+    # Skip blank lines and comments
+    [[ -z "$line" || "$line" =~ ^# ]] && continue
+    # Validate KEY=VALUE format
+    if [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+      KEY="${line%%=*}"
+      VALUE="${line#*=}"
+      if [ -z "$VALUE" ]; then
+        echo "⚠️  Skipping $KEY — no value set"
+        continue
+      fi
+      BUILD_ARGS="$BUILD_ARGS --build-arg $KEY=$VALUE"
+      echo "  ✔ $KEY"
+    else
+      echo "  ⚠️  Skipping malformed line: $line"
+    fi
+  done < "$ENV_FILE"
+else
+  echo "⚠️  No .env file found at '$ENV_FILE' — building without build args"
+fi
+
+# --------------------------------------------------
+# Run Docker build
+# --------------------------------------------------
+echo "🔨 Building Docker image..."
+docker build $BUILD_ARGS -t precommit-check .
 
 echo "✅ Docker build successful"
 exit 0
 EOF
-
 chmod +x scripts/*.sh
-
 echo "✔ Hook scripts created"
-
 # --------------------------------------------------
 # 5. Install pre-commit hooks
 # --------------------------------------------------
 echo "🔗 Installing pre-commit hooks..."
-
 pre-commit install --hook-type commit-msg || true
 pre-commit install --hook-type pre-push || true
-
 echo "🎉 Pre-commit bootstrap complete"
