@@ -18,7 +18,7 @@ if ! command -v pre-commit >/dev/null 2>&1; then
 
   if command -v apt-get >/dev/null 2>&1; then
     echo "🐧 Detected Linux (apt)"
-    sudo apt-get update && sudo apt-get install -y pre-commit
+    sudo apt-get install -y pre-commit
 
   elif command -v brew >/dev/null 2>&1; then
     echo "🍎 Detected macOS (Homebrew)"
@@ -46,8 +46,9 @@ if ! command -v docker >/dev/null 2>&1; then
   echo "👉 Please install Docker before continuing."
   exit 1
 fi
+
 # --------------------------------------------------
-# 6. Write .pre-commit-config.yaml
+# Write .pre-commit-config.yaml
 # --------------------------------------------------
 echo "📄 Writing .pre-commit-config.yaml..."
 cat > .pre-commit-config.yaml <<'YAML'
@@ -63,11 +64,12 @@ repos:
         name: Docker Build Validation
         entry: scripts/docker-build.sh
         language: system
-        stages: [push]
+        stages: [pre-push]
 YAML
 echo "✔ .pre-commit-config.yaml created"
+
 # --------------------------------------------------
-# 7. Write hook scripts
+# Write hook scripts
 # --------------------------------------------------
 echo "📂 Writing hook scripts..."
 mkdir -p scripts
@@ -109,38 +111,61 @@ if echo "$MESSAGE" | grep -Eq "\bskip[-_ ]?build\b"; then
   exit 0
 fi
 
-# --------------------------------------------------
-# Dynamically load build args from cred.yml
-# --------------------------------------------------
-BUILD_ARGS=""
+DOCKERFILE="${DOCKERFILE_PATH:-Dockerfile}"
 CRED_FILE="${DOCKER_CRED_FILE:-cred.yml}"
+BUILD_ARGS=""
 
-if [ -f "$CRED_FILE" ]; then
-  echo "📄 Loading build args from $CRED_FILE..."
+if [ ! -f "$DOCKERFILE" ]; then
+  echo "❌ Dockerfile not found at '$DOCKERFILE'"
+  exit 1
+fi
 
-  if ! command -v yq >/dev/null 2>&1; then
-    echo "❌ 'yq' is required but not found."
-    echo "👉 Install it: https://github.com/mikefarah/yq#install"
-    exit 1
-  fi
+# --------------------------------------------------
+# Extract ARG names declared in the Dockerfile
+# --------------------------------------------------
+DOCKERFILE_ARGS=$(grep -E "^ARG[[:space:]]+" "$DOCKERFILE" \
+  | sed 's/^ARG[[:space:]]*//' \
+  | sed 's/=.*//' \
+  | sed 's/[[:space:]]*$//' \
+  | sort -u)
 
-  while IFS="=" read -r KEY VALUE; do
-    [ -z "$KEY" ] && continue
-    if [ -z "$VALUE" ]; then
-      echo "  ⚠️  Skipping $KEY — no value set"
-      continue
-    fi
-    BUILD_ARGS="$BUILD_ARGS --build-arg $KEY=$VALUE"
-    echo "  ✔ $KEY"
-  done < <(yq e '. | to_entries | .[] | .key + "=" + .value' "$CRED_FILE")
+if [ -z "$DOCKERFILE_ARGS" ]; then
+  echo "ℹ️  No ARG instructions found in Dockerfile — skipping cred.yml"
 else
-  echo "⚠️  No cred.yml found at '$CRED_FILE' — building without build args"
+  echo "🔎 Dockerfile declares ARGs:"
+  echo "$DOCKERFILE_ARGS" | sed 's/^/     /'
+
+  if [ -f "$CRED_FILE" ]; then
+    echo "📄 Matching build args from $CRED_FILE..."
+
+    while IFS="=" read -r KEY VALUE; do
+      [ -z "$KEY" ] && continue
+      KEY=$(echo "$KEY" | tr -d ' ')
+      VALUE=$(echo "$VALUE" | tr -d ' ')
+
+      if echo "$DOCKERFILE_ARGS" | grep -qx "$KEY"; then
+        if [ -z "$VALUE" ]; then
+          echo "  ⚠️  Skipping $KEY — no value set in cred.yml"
+          continue
+        fi
+        BUILD_ARGS="$BUILD_ARGS --build-arg $KEY=$VALUE"
+        echo "  ✔ Injecting $KEY"
+      else
+        echo "  ⏭ Skipping $KEY — not declared as ARG in Dockerfile"
+      fi
+    done < <(grep -E "^\s*[^#[:space:]]" "$CRED_FILE" | sed 's/:[[:space:]]*/=/')
+
+  else
+    echo "⚠️  Dockerfile has ARGs but no cred.yml found at '$CRED_FILE'"
+    echo "     Build will proceed — ARGs without --build-arg use their Dockerfile defaults"
+  fi
 fi
 
 # --------------------------------------------------
 # Run Docker build
 # --------------------------------------------------
 echo "🔨 Building Docker image..."
+# shellcheck disable=SC2086
 docker build $BUILD_ARGS -t precommit-check .
 
 echo "✅ Docker build successful"
@@ -149,8 +174,9 @@ EOF
 
 chmod +x scripts/*.sh
 echo "✔ Hook scripts created"
+
 # --------------------------------------------------
-# 8. Update .gitignore
+# Update .gitignore
 # --------------------------------------------------
 echo "📝 Updating .gitignore..."
 touch .gitignore
@@ -167,16 +193,15 @@ for ENTRY in "${GITIGNORE_ENTRIES[@]}"; do
 done
 
 echo "✔ .gitignore updated"
+
 # --------------------------------------------------
-# 9. Install pre-commit hooks
+# Install pre-commit hooks
 # --------------------------------------------------
 echo "🔗 Installing pre-commit hooks..."
 pre-commit install --hook-type commit-msg || true
 pre-commit install --hook-type pre-push || true
 echo ""
 echo "🎉 Pre-commit bootstrap complete!"
-echo "✔ Platform: $PLATFORM"
 echo "✔ JIRA check enabled"
 echo "✔ Docker build validation enabled"
-echo "✔ Dynamic build args via cred.yml"
 echo "✔ skip-build supported"
