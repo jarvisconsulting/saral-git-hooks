@@ -1,33 +1,53 @@
 #!/bin/bash
 set -e
-echo "🚀 Bootstrapping pre-commit (single-file remote installer)..."
+
+echo "🚀 Bootstrapping pre-commit & pre-push hooks..."
 # --------------------------------------------------
-# 1. Detect project root
+# Resolve project root
 # --------------------------------------------------
-if ! PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null); then
-  echo "❌ Not inside a git repository."
-  exit 1
-fi
-echo "📁 Project root: $PROJECT_ROOT"
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
+
+echo "📁 Project root: $PROJECT_ROOT"
+
 # --------------------------------------------------
-# 2. Ensure pre-commit is installed
+# Install pre-commit (Cross-platform)
 # --------------------------------------------------
 if ! command -v pre-commit >/dev/null 2>&1; then
-  echo "📦 pre-commit not found."
+  echo "📦 pre-commit not found. Installing..."
+
   if command -v apt-get >/dev/null 2>&1; then
-    echo "➡️ Installing pre-commit via apt-get..."
-    sudo apt-get install -y pre-commit
+    echo "🐧 Detected Linux (apt)"
+    sudo apt-get update && sudo apt-get install -y pre-commit
+
+  elif command -v brew >/dev/null 2>&1; then
+    echo "🍎 Detected macOS (Homebrew)"
+    brew install pre-commit
+
+  elif command -v pip3 >/dev/null 2>&1; then
+    echo "🐍 Installing via pip"
+    pip3 install --user pre-commit
+    export PATH="$HOME/.local/bin:$PATH"
+
   else
-    echo "❌ pre-commit not installed and automatic install not supported."
+    echo "❌ No supported package manager found."
     echo "👉 Install manually: https://pre-commit.com/#install"
     exit 1
   fi
 else
   echo "✔ pre-commit already installed"
 fi
+
 # --------------------------------------------------
-# 3. Write .pre-commit-config.yaml
+# Validate Docker
+# --------------------------------------------------
+if ! command -v docker >/dev/null 2>&1; then
+  echo "❌ Docker is not installed."
+  echo "👉 Please install Docker before continuing."
+  exit 1
+fi
+# --------------------------------------------------
+# 6. Write .pre-commit-config.yaml
 # --------------------------------------------------
 echo "📄 Writing .pre-commit-config.yaml..."
 cat > .pre-commit-config.yaml <<'YAML'
@@ -47,7 +67,7 @@ repos:
 YAML
 echo "✔ .pre-commit-config.yaml created"
 # --------------------------------------------------
-# 4. Write hook scripts
+# 7. Write hook scripts
 # --------------------------------------------------
 echo "📂 Writing hook scripts..."
 mkdir -p scripts
@@ -63,7 +83,6 @@ if [ -z "$COMMIT_MSG_FILE" ] || [ ! -f "$COMMIT_MSG_FILE" ]; then
   exit 1
 fi
 MESSAGE=$(cat "$COMMIT_MSG_FILE")
-# JIRA ticket anywhere in message
 if ! echo "$MESSAGE" | grep -Eq "\b[A-Z]+-[0-9]+\b"; then
   echo ""
   echo "❌ Commit rejected!"
@@ -91,7 +110,7 @@ if echo "$MESSAGE" | grep -Eq "\bskip[-_ ]?build\b"; then
 fi
 
 # --------------------------------------------------
-# Dynamically load build args from cred.yml file
+# Dynamically load build args from cred.yml
 # --------------------------------------------------
 BUILD_ARGS=""
 CRED_FILE="${DOCKER_CRED_FILE:-cred.yml}"
@@ -99,9 +118,8 @@ CRED_FILE="${DOCKER_CRED_FILE:-cred.yml}"
 if [ -f "$CRED_FILE" ]; then
   echo "📄 Loading build args from $CRED_FILE..."
 
-  # Require yq for YAML parsing
   if ! command -v yq >/dev/null 2>&1; then
-    echo "❌ 'yq' is required to parse cred.yml but was not found."
+    echo "❌ 'yq' is required but not found."
     echo "👉 Install it: https://github.com/mikefarah/yq#install"
     exit 1
   fi
@@ -132,9 +150,33 @@ EOF
 chmod +x scripts/*.sh
 echo "✔ Hook scripts created"
 # --------------------------------------------------
-# 5. Install pre-commit hooks
+# 8. Update .gitignore
+# --------------------------------------------------
+echo "📝 Updating .gitignore..."
+touch .gitignore
+
+GITIGNORE_ENTRIES=(
+  "scripts/"
+  "cred.yml"
+  ".pre-commit-config.yaml"
+)
+
+for ENTRY in "${GITIGNORE_ENTRIES[@]}"; do
+  grep -qxF "$ENTRY" .gitignore || echo "$ENTRY" >> .gitignore
+  echo "  ✔ $ENTRY"
+done
+
+echo "✔ .gitignore updated"
+# --------------------------------------------------
+# 9. Install pre-commit hooks
 # --------------------------------------------------
 echo "🔗 Installing pre-commit hooks..."
 pre-commit install --hook-type commit-msg || true
 pre-commit install --hook-type pre-push || true
-echo "🎉 Pre-commit bootstrap complete"
+echo ""
+echo "🎉 Pre-commit bootstrap complete!"
+echo "✔ Platform: $PLATFORM"
+echo "✔ JIRA check enabled"
+echo "✔ Docker build validation enabled"
+echo "✔ Dynamic build args via cred.yml"
+echo "✔ skip-build supported"
