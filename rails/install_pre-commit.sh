@@ -64,7 +64,7 @@ repos:
         name: Docker Build Validation
         entry: scripts/docker-build.sh
         language: system
-        stages: [pre-push]
+        stages: [push]
 YAML
 echo "✔ .pre-commit-config.yaml created"
 
