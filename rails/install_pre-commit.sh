@@ -109,10 +109,10 @@ set -e
 # ==================================================
 declare -A IMAGE_MAP=(
   ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/node:18"]="node:18-alpine"
-  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/golang:1.25"]="golang:1.25-alpine"
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/golang:1.25-alpine"]="golang:1.25-alpine"
   ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/ubuntu:22.04"]="ubuntu:22.04"
   ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/python:3.11"]="python:3.11-slim"
-  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/distroless-base:debian12"]="distroless-base:debian12"
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/distroless-base:debian12"]="gcr.io/distroless/base-debian12"
   ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/node:16"]="node:16-alpine"
   ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/alpine:3.18"]="alpine:3.18"
 )
