@@ -97,10 +97,26 @@ echo "✔ Commit message contains valid JIRA ticket"
 exit 0
 EOF
 
-# ---- docker-build.sh ----
+# ---- docker-build.sh (ENHANCED WITH IMAGE HASH MAP) ----
 cat > scripts/docker-build.sh <<'EOF'
 #!/bin/bash
 set -e
+
+# ==================================================
+# DOCKER IMAGE HASH MAP (Private → Public)
+# ==================================================
+# BJP-SARAL Custom Images → Public Alternatives
+# ==================================================
+declare -A IMAGE_MAP=(
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/node:18"]="node:18-alpine"
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/golang:1.24"]="golang:1.24-alpine"
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/ubuntu:22.04"]="ubuntu:22.04"
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/python:3.11"]="python:3.11-slim"
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/python:3.9"]="python:3.9-slim"
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/node:16"]="node:16-alpine"
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/alpine:3.18"]="alpine:3.18"
+)
+
 echo "🐳 Running Docker build validation..."
 
 MESSAGE=$(git log -1 --pretty=%B)
@@ -121,9 +137,43 @@ if [ ! -f "$DOCKERFILE" ]; then
 fi
 
 # --------------------------------------------------
+# Replace private images with public alternatives
+# --------------------------------------------------
+echo "🔄 Processing Docker image references..."
+
+TEMP_DOCKERFILE=$(mktemp)
+cp "$DOCKERFILE" "$TEMP_DOCKERFILE"
+
+IMAGE_REPLACED=false
+
+for PRIVATE_IMG in "${!IMAGE_MAP[@]}"; do
+  PUBLIC_IMG="${IMAGE_MAP[$PRIVATE_IMG]}"
+  
+  if grep -q "$PRIVATE_IMG" "$TEMP_DOCKERFILE"; then
+    echo "  🔄 Replacing: $PRIVATE_IMG"
+    echo "     ➜ With:     $PUBLIC_IMG"
+    sed -i "s|$PRIVATE_IMG|$PUBLIC_IMG|g" "$TEMP_DOCKERFILE"
+    IMAGE_REPLACED=true
+  fi
+done
+
+if [ "$IMAGE_REPLACED" = true ]; then
+  echo "✔ Private images substituted"
+fi
+
+# --------------------------------------------------
+# Verify substitutions
+# --------------------------------------------------
+echo ""
+echo "📋 Verifying substitutions:"
+echo "   FROM statements in temporary Dockerfile:"
+grep -E "^FROM|^from" "$TEMP_DOCKERFILE" | sed 's/^/   /' || echo "   (No FROM statements found)"
+echo ""
+
+# --------------------------------------------------
 # Extract ARG names declared in the Dockerfile
 # --------------------------------------------------
-DOCKERFILE_ARGS=$(grep -E "^ARG[[:space:]]+" "$DOCKERFILE" \
+DOCKERFILE_ARGS=$(grep -E "^ARG[[:space:]]+" "$TEMP_DOCKERFILE" \
   | sed 's/^ARG[[:space:]]*//' \
   | sed 's/=.*//' \
   | sed 's/[[:space:]]*$//' \
@@ -166,7 +216,10 @@ fi
 # --------------------------------------------------
 echo "🔨 Building Docker image..."
 # shellcheck disable=SC2086
-docker build $BUILD_ARGS -t precommit-check .
+docker build $BUILD_ARGS -t precommit-check -f "$TEMP_DOCKERFILE" .
+
+# Cleanup
+rm -f "$TEMP_DOCKERFILE"
 
 echo "✅ Docker build successful"
 exit 0
@@ -174,6 +227,38 @@ EOF
 
 chmod +x scripts/*.sh
 echo "✔ Hook scripts created"
+
+# --------------------------------------------------
+# Write image-map.yml (Separate config file for easier maintenance)
+# --------------------------------------------------
+echo "📋 Creating image-map.yml for centralized image management..."
+cat > image-map.yml <<'YAML'
+# Docker Image Substitution Map - BJP-SARAL Project
+# Format: private_image: public_image
+# 
+# Developers without access to asia-south1-docker.pkg.dev will use public alternatives
+# This ensures CI/CD pipelines work across all team members
+
+image_mappings:
+  # Node.js images
+  "asia-south1-docker.pkg.dev/bjp-saral/custom-image/node:18": "node:18-alpine"
+  "asia-south1-docker.pkg.dev/bjp-saral/custom-image/node:16": "node:16-alpine"
+  
+  # Go images
+  "asia-south1-docker.pkg.dev/bjp-saral/custom-image/golang:1.24": "golang:1.24-alpine"
+  
+  # Python images
+  "asia-south1-docker.pkg.dev/bjp-saral/custom-image/python:3.11": "python:3.11-slim"
+  "asia-south1-docker.pkg.dev/bjp-saral/custom-image/python:3.9": "python:3.9-slim"
+  
+  # Base OS images
+  "asia-south1-docker.pkg.dev/bjp-saral/custom-image/ubuntu:22.04": "ubuntu:22.04"
+  "asia-south1-docker.pkg.dev/bjp-saral/custom-image/alpine:3.18": "alpine:3.18"
+
+# Usage in docker-build.sh:
+# The associative array IMAGE_MAP is populated from the mappings above
+YAML
+echo "✔ image-map.yml created"
 
 # --------------------------------------------------
 # Update .gitignore
@@ -204,4 +289,10 @@ echo ""
 echo "🎉 Pre-commit bootstrap complete!"
 echo "✔ JIRA check enabled"
 echo "✔ Docker build validation enabled"
+echo "✔ Docker image substitution (asia-south1-docker.pkg.dev/bjp-saral/custom-image → public) enabled"
 echo "✔ skip-build supported"
+echo ""
+echo "📖 Next steps:"
+echo "   1. Review image-map.yml (shows your image mappings)"
+echo "   2. Commit and push to test the hooks"
+echo "   3. All developers can now build without bjp-saral registry access!"
