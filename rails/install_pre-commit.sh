@@ -97,7 +97,7 @@ echo "✔ Commit message contains valid JIRA ticket"
 exit 0
 EOF
 
-# ---- docker-build.sh (ENHANCED WITH IMAGE HASH MAP) ----
+# ---- docker-build.sh (FIXED IMAGE MAPPINGS) ----
 cat > scripts/docker-build.sh <<'EOF'
 #!/bin/bash
 set -e
@@ -108,13 +108,25 @@ set -e
 # BJP-SARAL Custom Images → Public Alternatives
 # ==================================================
 declare -A IMAGE_MAP=(
+  # Node.js images
   ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/node:18"]="node:18-alpine"
-  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/golang:1.25-alpine"]="golang:1.25-alpine"
-  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/ubuntu:22.04"]="ubuntu:22.04"
-  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/python:3.11"]="python:3.11-slim"
-  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/distroless-base:debian12"]="gcr.io/distroless/base-debian12"
   ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/node:16"]="node:16-alpine"
+  
+  # Go images (map full registry path, not just the tag)
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/golang:1.25"]="golang:1.25-alpine"
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/golang:1.24"]="golang:1.24-alpine"
+  
+  # Python images
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/python:3.11"]="python:3.11-slim"
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/python:3.9"]="python:3.9-slim"
+  
+  # Base OS images
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/ubuntu:22.04"]="ubuntu:22.04"
   ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/alpine:3.18"]="alpine:3.18"
+  
+  # Distroless images
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/distroless-base:debian12"]="gcr.io/distroless/base-debian12"
+  ["asia-south1-docker.pkg.dev/bjp-saral/custom-image/distroless-cc:debian12"]="gcr.io/distroless/cc-debian12"
 )
 
 echo "🐳 Running Docker build validation..."
@@ -159,6 +171,8 @@ done
 
 if [ "$IMAGE_REPLACED" = true ]; then
   echo "✔ Private images substituted"
+else
+  echo "ℹ️  No private images found to substitute"
 fi
 
 # --------------------------------------------------
@@ -244,7 +258,8 @@ image_mappings:
   "asia-south1-docker.pkg.dev/bjp-saral/custom-image/node:18": "node:18-alpine"
   "asia-south1-docker.pkg.dev/bjp-saral/custom-image/node:16": "node:16-alpine"
   
-  # Go images
+  # Go images (golang:1.25-alpine is already alpine, don't add -alpine again!)
+  "asia-south1-docker.pkg.dev/bjp-saral/custom-image/golang:1.25": "golang:1.25-alpine"
   "asia-south1-docker.pkg.dev/bjp-saral/custom-image/golang:1.24": "golang:1.24-alpine"
   
   # Python images
@@ -254,9 +269,10 @@ image_mappings:
   # Base OS images
   "asia-south1-docker.pkg.dev/bjp-saral/custom-image/ubuntu:22.04": "ubuntu:22.04"
   "asia-south1-docker.pkg.dev/bjp-saral/custom-image/alpine:3.18": "alpine:3.18"
-
-# Usage in docker-build.sh:
-# The associative array IMAGE_MAP is populated from the mappings above
+  
+  # Distroless images (use full gcr.io path)
+  "asia-south1-docker.pkg.dev/bjp-saral/custom-image/distroless-base:debian12": "gcr.io/distroless/base-debian12"
+  "asia-south1-docker.pkg.dev/bjp-saral/custom-image/distroless-cc:debian12": "gcr.io/distroless/cc-debian12"
 YAML
 echo "✔ image-map.yml created"
 
@@ -280,6 +296,12 @@ done
 echo "✔ .gitignore updated"
 
 # --------------------------------------------------
+# Migrate pre-commit config to use 'pre-push' instead of 'push'
+# --------------------------------------------------
+echo "🔄 Migrating .pre-commit-config.yaml to latest format..."
+pre-commit migrate-config || true
+
+# --------------------------------------------------
 # Install pre-commit hooks
 # --------------------------------------------------
 echo "🔗 Installing pre-commit hooks..."
@@ -294,5 +316,7 @@ echo "✔ skip-build supported"
 echo ""
 echo "📖 Next steps:"
 echo "   1. Review image-map.yml (shows your image mappings)"
-echo "   2. Commit and push to test the hooks"
-echo "   3. All developers can now build without bjp-saral registry access!"
+echo "   2. Delete old scripts: rm -rf scripts/"
+echo "   3. Run this bootstrap script again: ./bootstrap-bjp-saral-fixed.sh"
+echo "   4. Commit and push to test the hooks"
+echo "   5. All developers can now build without bjp-saral registry access!"
